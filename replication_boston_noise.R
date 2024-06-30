@@ -1,3 +1,4 @@
+# This code is done on the Boston Housing dataset. If you wish to test it on another dataset you need to make a few modifications to the code.
 # Installing packages
 # install.packages("quantregForest")
 # install.packages("mlbench")
@@ -20,17 +21,20 @@ library(dplyr)
 library(ggplot2)
 library(gridExtra)
 library(tidyr)
-library(dplyr)
 
+# Set working directory to wherever your guide program is located, otherwise the tree-based models will not work
 setwd("/Users/quintyokhuijsen/Desktop/guide")
 
+# Loading the boston housing dataset from the mlbench package
 data("BostonHousing")
 boston <- BostonHousing
+
 # Set the response variable
+#You need to change this if you use another dataset or response variable
 response_var_boston_noise <- "medv"
 
 # Get the predictor variables (excluding the response variable)
-predictor_vars <- setdiff(names(boston), response_var_boston)
+predictor_vars <- setdiff(names(boston), response_var_boston_noise)
 
 # Function to permute a variable
 permute_variable <- function(variable) {
@@ -47,51 +51,42 @@ for (var in predictor_vars) {
   boston_noise[[new_var_name]] <- permuted_var
 }
 
-
-#Shuffling the dataset and cutting it into 5 equal parts
+# Permuting the dataset and cutting it into 5 equal parts (for random cross-validation)
 set.seed(123)
 boston_noise <- boston_noise[sample(nrow(boston_noise)), ]
 folds_boston_noise <- cut(seq(1, nrow(boston_noise)), breaks=5, labels=FALSE)
 
-#Store training and test data splits
+# Store training and test data splits
 boston_noise_train <- list()
 boston_noise_test <- list()
 
-#Store results for QRF
+# Creating the dataframes that store the loss results for each method
 results_qrf_boston_noise <- data.frame()
-
-#Store results for LQR
 results_lqr_boston_noise <- data.frame()
-
-#Store results for QQR
 results_qqr_next_boston_noise <- data.frame()
-
-#Store results for TRM
 results_trm_boston_noise <- data.frame()
-
-#Store results for TRC
 results_trc_boston_noise <- data.frame()
-
-#Store results for TRP
 results_trp_boston_noise <- data.frame()
 
-#Function for the quantile loss function
+# Function for the quantile loss function
 quantile_loss_function <- function(actual, predicted, alpha) {
   abs_diff <- abs(actual - predicted)
   weights <- ifelse(actual > predicted, alpha, 1 - alpha)
   mean(weights * abs_diff)
 }
 
-#Setting up guide
+# The phrase that runs guide
 guide_executable <- "./guide"
 
-#Function for generating dsc files for TRM in guide
+# Function for generating dsc files for TRM in guide
+# These files should otherwise be manually created in order for guide to work
 trm_generate_dsc_file <- function(fold_num, response_var) {
   
-  # Saving the training file
+  # This creates a custom file name based on the fold (e.g. fold 1 would have the name boston_train_1.txt)
   train_file_name <- paste0("boston_noise_train_", fold_num, ".txt")
   
-  # Creating the dsc content
+  # This is what the structure of the dsc file should look like. It should start with the training data (since we use cross-validation this is the training fold), then list all the variables with their type
+  # If you wish to use another dataset, this is where you should change the variables for your own dataset
   dsc_content <- c(
     train_file_name,
     "NA",
@@ -125,17 +120,19 @@ trm_generate_dsc_file <- function(fold_num, response_var) {
     paste0("27 lstat_permuted n")
   )
   
-  # Saving the dsc file
+  # Then we end up with 5 dsc files for each of the 5 folds
   dsc_file_name <- paste0("boston_noise_", fold_num, ".dsc")
   writeLines(dsc_content, con = dsc_file_name)
 }
 
-#input file creation for TRM for guide
+# Input file creation for TRM for guide 
+# Normally when you run guide, the program automatically creates these input files for you based on your answers to several questions
+# This method speeds up the process by generating all of the input files in one go, as doing it all manually takes a lot of time
 trm_create_input_file <- function(fold, quantile) {
-  # Format the quantile to the desired format
+  # We format the quantile
   quantile_str <- sprintf("q%03d", quantile * 1000)
   
-  # Define file names based on fold and quantile
+  # We create the file names based on the fold and quantile the program is running for
   output_file_name <- paste0("out_TRM_boston_noise_", fold, "_", quantile_str, ".txt")
   dsc_file_name <- paste0("boston_noise_", fold, ".dsc")
   latex_file_name <- paste0("TRM_boston_noise_", fold, "_", quantile_str, ".tex")
@@ -143,7 +140,7 @@ trm_create_input_file <- function(fold, quantile) {
   r_code_file_name <- paste0("predict_TRM_boston_noise_", fold, "_", quantile_str, ".r")
   input_file_name <- paste0("in_TRM_boston_noise_", fold, "_", quantile_str, ".txt")
   
-  # Create the content for the input file
+  # Here the content of the input file is created. The structure of a general input file is basically copied and changed for each fold and quantile
   input_content <- c(
     "GUIDE       (do not edit this file unless you know what you are doing)",
     "  42.4      (version of GUIDE that generated this file)",
@@ -175,12 +172,11 @@ trm_create_input_file <- function(fold, quantile) {
     " 1          (rank of top variable to split root node)"
   )
   
-  # Write the content to the input file
-  
+  # We then save the input file for later use
   writeLines(input_content, con = input_file_name)
 }
 
-# Function to create TRC input files for GUIDE
+# Function to create TRC input files for GUIDE. This is done in the same way as we did for TRM above, but now with the answers specific to TRC.
 trc_create_guide_input_files <- function(fold, quantile) {
   file_content <- paste(
     "GUIDE       (do not edit this file unless you know what you are doing)",
@@ -216,10 +212,9 @@ trc_create_guide_input_files <- function(fold, quantile) {
   
   file_name <- sprintf("in_TRC_boston_noise_%d_q%03d.txt", fold, quantile * 1000)
   writeLines(file_content, file_name)
-  
 }
 
-# Function to create TRP input files for GUIDE
+# Function to create TRP input files for GUIDE. This is done in the same way as we did for TRM and TRC above, but now with the answers specific to TRP.
 trp_create_guide_input_files <- function(fold, quantile) {
   file_content <- paste(
     "GUIDE       (do not edit this file unless you know what you are doing)",
@@ -257,26 +252,25 @@ trp_create_guide_input_files <- function(fold, quantile) {
   
   file_name <- sprintf("in_TRP_boston_noise_%d_q%03d.txt", fold, quantile * 1000)
   writeLines(file_content, file_name)
-  
 }
 
-#Specifying quantiles
+# Specifying quantiles
 quantiles <- c(0.005, 0.025, 0.05, 0.5, 0.95, 0.975, 0.995)
 
-#Starting the 5-fold cross validation loop
+# Starting the 5-fold cross-validation loop
 for (i in 1:5) {
-  #Splitting the dataset for the 5 fold cross validation
+  # Splitting the dataset for the 5 fold cross-validation
   cat("\n")
   cat("+++++++++ Processing Fold:", i, "++++++++++++++++ \n")
   testIndexes_boston_noise <- which(folds_boston_noise == i, arr.ind = TRUE)
   boston_noise_test[[i]] <- boston_noise[testIndexes_boston_noise, ]
   boston_noise_train[[i]] <- boston_noise[-testIndexes_boston_noise, ]
   
-  #Saving the training and test files for later use in guide
+  # Saving the training and test files for later use in guide. Remember the dsc files use the boston_train_ files, so it is necessary to save the folds
   write.table(boston_noise_train[[i]], file = paste0("boston_noise_train_", i, ".txt"), row.names = FALSE, col.names = FALSE, quote=FALSE)
   write.table(boston_noise_test[[i]], file = paste0("boston_noise_test_", i, ".txt"), row.names = FALSE, col.names = FALSE, quote=FALSE)
   
-  #Preparing folds for training and testing
+  # Preparing folds for training and testing
   train_fold_boston_noise <- boston_noise_train[[i]]
   test_fold_boston_noise <- boston_noise_test[[i]]
   
@@ -286,23 +280,23 @@ for (i in 1:5) {
   y_train_boston_noise <- train_fold_boston_noise[[response_var_boston_noise]]
   y_test_boston_noise <- test_fold_boston_noise[[response_var_boston_noise]]
   
-  #---QRF---
+  # --- QRF ---
+  # Here we build the QRF model and save it to the cq (conditional quantiles) dataframe
   qrf_boston_noise <- quantregForest(x=x_train_boston_noise, y=y_train_boston_noise, ntree=1000, mtry=4, nodesize=10)
   
   cq_qrf_boston_noise <- predict(qrf_boston_noise, x_test_boston_noise, what=quantiles)
   colnames(cq_qrf_boston_noise) <- paste0("quantile= ", quantiles)
   
-  
-  #Evaluate quantile loss for each quantile
+  # Evaluate quantile loss for each quantile of QRF
   for (q in quantiles) {
     quantile_name <- paste0("quantile= ", q)
     
     loss_qrf_boston_noise <- quantile_loss_function(y_test_boston_noise, cq_qrf_boston_noise[, quantile_name], q)
     results_qrf_boston_noise <- rbind(results_qrf_boston_noise, data.frame(Quantile = q, Method = "QRF", Loss = loss_qrf_boston_noise))
-    
   }
   
   # --- LQR ------
+  # Here we model the LQR method
   for (q in quantiles) {
     lqr_model_boston_noise <- rq(medv ~ crim + zn + indus + chas + nox + rm + age + dis + rad + tax + ptratio + b + lstat + crim_permuted + zn_permuted + indus_permuted + chas_permuted + nox_permuted + rm_permuted + age_permuted + dis_permuted + rad_permuted + tax_permuted + ptratio_permuted + b_permuted + lstat_permuted, data = train_fold_boston_noise, tau = q)
     cq_lqr_boston_noise <- predict.rq(lqr_model_boston_noise, newdata = test_fold_boston_noise)
@@ -310,7 +304,8 @@ for (i in 1:5) {
     results_lqr_boston_noise <- rbind(results_lqr_boston_noise, data.frame(Fold = i, Quantile = q, Method = "LQR", Loss = loss_lqr_boston_noise))
   }
   
-  #--- QQR ---
+  # --- QQR ---
+  # Here we model the QQR method
   cat("== QQR for fold ", i, " == \n")
   base_formula_boston_noise <- as.formula(medv ~ crim + zn + indus + chas + nox + rm + age + dis + rad + tax + ptratio + b + lstat + crim_permuted + zn_permuted + indus_permuted + chas_permuted + nox_permuted + rm_permuted + age_permuted + dis_permuted + rad_permuted + tax_permuted + ptratio_permuted + b_permuted + lstat_permuted)
   base_error_boston_noise <- mean(results_lqr_boston_noise$Loss)
@@ -320,7 +315,7 @@ for (i in 1:5) {
   predictors_boston_noise <- setdiff(names(boston_noise), response_var_boston_noise)
   interaction_terms_boston_noise <- combn(predictors_boston_noise, 2, FUN = function(x) paste(x, collapse = ":"))
   
-  # Track the best model and its CV error
+  # We keep track of the best qqr model and its error
   best_model_boston_noise_qqr <- base_formula_boston_noise
   best_cv_error_boston_noise_qqr <- base_error_boston_noise
   improved <- TRUE
@@ -331,13 +326,10 @@ for (i in 1:5) {
     current_best_error <- best_cv_error_boston_noise_qqr
     
     for (term in interaction_terms_boston_noise) {
-      #cat("\n")
-      #cat("Checking interaction term: ", term, "\n")
-      # Add interaction term to the model formula
+      # Here we add the different interaction terms to the model
       formula_with_interaction_boston_noise <- as.formula(paste(deparse(current_best_formula), "+", term))
-      #cat("Which gives the formula:", deparse(formula_with_interaction_boston_noise), "\n")
       
-      # Fit quantile regression model
+      # We fit all the QR models with the interaction term for each quantile
       for (q in quantiles) {
         cat("Checking interaction term: ", term, "\n")
         qqr_next_boston_noise <- rq(formula_with_interaction_boston_noise, data = train_fold_boston_noise, tau = q)
@@ -347,75 +339,65 @@ for (i in 1:5) {
       }
       
       next_error_boston_noise_qqr <- mean(results_qqr_next_boston_noise$Loss[results_qqr_next_boston_noise$Fold == i & results_qqr_next_boston_noise$Quantile == q])
-      #cat("And the corresponding error: ", next_error_boston_noise_qqr, "\n")
       
       # Update the best model if current one is better
       if (next_error_boston_noise_qqr < current_best_error) {
-        #cat("The added term is BETTER", "\n")
         current_best_error <- next_error_boston_noise_qqr
         current_best_formula <- formula_with_interaction_boston_noise
-        #cat("With corresponding formula: ", deparse(current_best_formula), "\n")
         improved <- TRUE
-      } else {
-        #cat("The added term is WORSE", "\n")
-        #cat("With corresponding formula: ", deparse(formula_with_interaction_boston_noise), "\n")
       }
     }
     
-    
-    
     if (improved) {
-      #cat("The current model is BETTER", "\n")
       best_cv_error_boston_noise_qqr <- current_best_error
       best_model_boston_noise_qqr <- current_best_formula
-      #cat("This model is: ", deparse(best_model_boston_noise_qqr), "and has error: ", best_cv_error_boston_noise_qqr, "\n")
-    } else {
-      
-      
     }
     
     cat("Final model: ", deparse(best_model_boston_noise_qqr), "with error: ", best_cv_error_boston_noise_qqr, "\n")
     cat("-------------------- \n")
   }
   
-  #---- TRM ----
+  # ---- TRM ----
+  # This is for the TRM method
   cat("== TRM for fold ", i, " == \n")
   
-  #Generate the dsc files
+  # Here we generate the dsc files for each fold
   trm_generate_dsc_file(i, response_var_boston_noise)
   cat("DSC file for fold ", i, " generated \n")
   
-  #Generate the input files
+  # And we create the input files for each fold and quantile (this is why it is good to generate this process with Rstudio, otherwise you would have manually had to create 35 input files in guide)
   for (q in quantiles) {
     input_file_name <- trm_create_input_file(i, q)
     
-    # Store input file name
+    # Give the input file a name based on dataset, quantile, and fold
     input_file_boston_noise <- sprintf("in_TRM_boston_noise_%d_q%03d.txt", i, q * 1000)
     
-    #Run guide for all folds and quantiles
-    # Run GUIDE
+    # Run guide for all folds and quantiles
+    # This was the command to use in the terminal to open guide
     guide_command <- paste(guide_executable, "<", input_file_boston_noise)
+    # Making sure that guide runs (this was a debugging statement)
     print(paste("Running GUIDE with command:", guide_command))
     system(guide_command)
     
-    # Define the R script filename
+    # This is the R script file name corresponding to the dataset, fold, and quantile
     r_script_boston_noise <- sprintf("predict_TRM_boston_noise_%d_q%03d.R", i, q * 1000)
     
-    # Read the existing R script content
+    # Here we read the R script content
     r_script_content <- readLines(r_script_boston_noise)
     
-    # Change the lines related to reading the test file and column names
+    # There were some issues with running the R script content, so I had to make some changes to the script
+    # First of all, the sep had to be changed
     r_script_content <- gsub("read.table\\((.*)\\)", "read.table(\\1, sep = \"\")", r_script_content)
     r_script_content <- gsub("newdata <- read.table\\(.*\\)", sprintf("newdata <- read.table('boston_noise_test_%d.txt', header = FALSE, colClasses = 'character', sep = '')", i), r_script_content)
-    # Change the node and pred lines
+    # And the following had to be modified too
     r_script_content <- gsub("node <- NULL", "node <- NULL\npred <- NULL", r_script_content)
     
-    
-    # Change the lines that convert columns to numeric and calculate predictions
+    # Here we had to convert the columns to numeric as this was causing issues
     r_script_content <- gsub("newdata <- transform\\(.*\\)", "", r_script_content)
     r_script_content <- gsub("newdata <- as.numeric\\(.*\\)", "", r_script_content)
     
-    # Add new data transformation block after the prediction loop
+    # The placement of "newdata" was also incorrect, so we changed that too
+    # If you want to use another dataset, you need to change the variables here to your own variables too.
     r_script_content <- c(r_script_content, 
                           "# Convert columns to numeric",
                           "newdata <- transform(newdata,",
@@ -466,39 +448,36 @@ for (i in 1:5) {
                           "print(paste('Mean Quantile Loss:', mean_loss))",
                           sprintf("write(mean_loss, 'loss_fold_boston_noise_%d_q%03d_TRM.txt')", i, q * 1000))
     
-    # Write the modified content back to the R script
+    # Write the changed content back to the original R script
     writeLines(r_script_content, r_script_boston_noise)
     
-    # Run the modified prediction script
+    # Run this new and changed r script
     r_command <- paste("Rscript", r_script_boston_noise)
+    # Checking if command is correct
     print(paste("Running R script with command:", r_command))
     system(r_command)
     
+    # Here we can see the loss calculated by the r script
     loss_file_boston_noise <- sprintf("loss_fold_%d_q%03d_TRM.txt", i, q * 1000)
-    cat("Loss for fold ", i, "and quantile " , q, " : ", loss_file_boston_noise, "\n")
+    cat("Loss for fold ", i, "and quantile ", q, " : ", loss_file_boston_noise, "\n")
     
     loss_value <- as.numeric(readLines(loss_file_boston_noise))
     results_trm_boston_noise <- rbind(results_trm_boston_noise, data.frame(Fold = i, Quantile = q, Loss = loss_value))
-    
   }
-  #---TRC---
-  #Generate input files for TRC
+  
+  # --- TRC ---
+  # Generate input files for TRC (repeat what you did for TRM but now for TRC)
   for (q in quantiles) {
     input_file_name <- trc_create_guide_input_files(i, q)
     input_file_boston_noise <- sprintf("in_TRC_boston_noise_%d_q%03d.txt", i, q * 1000)
     
-    
-    # Run GUIDE
     guide_command <- paste(guide_executable, "<", input_file_boston_noise)
     print(paste("Running GUIDE with command:", guide_command))
     system(guide_command)
     
-    # Generate prediction R script name
     r_script <- sprintf("predict_TRC_boston_noise_%d_q%03d.r", i, q * 1000)
     
-    
-    
-    # Change the R script to read from the test file and calculate loss
+    # Again, we had to make changes to this R script as it was not working in the first place
     r_script_content <- readLines(r_script)
     r_script_content <- gsub("read.table\\((.*)\\)", "read.table(\\1, sep = \"\")", r_script_content)
     r_script_content <- gsub("newdata <- read.table\\(.*\\)", sprintf("newdata <- read.table('boston_noise_test_%d.txt', header = FALSE, colClasses = 'character', sep = '')", i), r_script_content)
@@ -552,38 +531,37 @@ for (i in 1:5) {
       "mean_loss <- mean(loss_values, na.rm = TRUE)",
       "# Print the mean quantile loss",
       "print(paste('Mean Quantile Loss:', mean_loss))",
-      sprintf("write(mean_loss, 'loss_fold_%d_q%03d_trc_boston_noise.txt')", i, q * 1000)
+      sprintf("write(mean_loss, 'loss_fold_boston_noise_%d_q%03d_trc.txt')", i, q * 1000)
     )
     
     writeLines(r_script_content, r_script)
     
-    # Run the modified prediction script
+    # Here again we run the r script
     r_command <- paste("Rscript", r_script)
     print(paste("Running R script with command:", r_command))
     system(r_command)
     
+    # And this r script calculates the average loss per fold and quantile
     loss_file_boston_noise <- sprintf("loss_fold_%d_q%03d_TRC_boston_noise.txt", i, q * 1000)
-    cat("Loss for fold ", i, "and quantile " , q, " : ", loss_file_boston_noise, "\n")
+    cat("Loss for fold ", i, "and quantile ", q, " : ", loss_file_boston_noise, "\n")
     
     loss_value <- as.numeric(readLines(loss_file_boston_noise))
     results_trc_boston_noise <- rbind(results_trc_boston_noise, data.frame(Fold = i, Quantile = q, Loss = loss_value))
   }
   
-  #--- TRP---
-  # Generate input files for TRP
+  # --- TRP ---
+  # Generate input files for TRP (same thing as for TRM and TRC)
   for (q in quantiles) {
     input_file_name <- trp_create_guide_input_files(i, q)
     input_file_boston_noise <- sprintf("in_TRP_boston_noise_%d_q%03d.txt", i, q * 1000)
     
-    # Run GUIDE
     guide_command <- paste(guide_executable, "<", input_file_boston_noise)
     print(paste("Running GUIDE with command:", guide_command))
     system(guide_command)
     
-    # Generate prediction R script name
     r_script <- sprintf("predict_TRP_boston_noise_%d_q%03d.r", i, q * 1000)
     
-    # Change the R script to read from the test file and calculate loss
+    # We again make modifications in the r script like in TRM and TRC
     r_script_content <- readLines(r_script)
     r_script_content <- gsub("read.table\\((.*)\\)", "read.table(\\1, sep = \"\")", r_script_content)
     r_script_content <- gsub("boston_noise_train_[0-9]+.txt", sprintf("boston_noise_test_%d.txt", i), r_script_content)
@@ -637,63 +615,62 @@ for (i in 1:5) {
       "mean_loss <- mean(loss_values, na.rm = TRUE)",
       "# Print the mean quantile loss",
       "print(paste('Mean Quantile Loss:', mean_loss))",
-      sprintf("write(mean_loss, 'loss_fold_%d_q%03d_TRP_boston_noise.txt')", i, q * 1000)
+      sprintf("write(mean_loss, 'loss_fold_boston_noise_%d_q%03d_TRP.txt')", i, q * 1000)
     )
     
     writeLines(r_script_content, r_script)
     
     # Run the modified prediction script
     r_command <- paste("Rscript", r_script)
+    # Checking if the r command is correct
     print(paste("Running R script with command:", r_command))
     system(r_command)
     
+    # And again here we can see the loss value that the r script calculates 
     loss_file_boston_noise <- sprintf("loss_fold_%d_q%03d_TRP_boston_noise.txt", i, q * 1000)
     loss_value <- as.numeric(readLines(loss_file_boston_noise))
     results_trp_boston_noise <- rbind(results_trp_boston_noise, data.frame(Fold = i, Quantile = q, Loss = loss_value))
   }
-  
-  
-  
 }
 
-#--- QRF ---
-#Summarising QRF mean loss results
+# --- QRF ---
+# Summarising QRF mean loss results
 summary_qrf_boston_noise <- results_qrf_boston_noise %>%
   group_by(Quantile, Method) %>%
   summarise(MeanLoss = mean(Loss, na.rm = TRUE, scientific = FALSE), .groups = 'drop')
 print(summary_qrf_boston_noise)
 
-#--- LQR ---
-#Summarising LQR mean loss results
+# --- LQR ---
+# Summarising LQR mean loss results
 summary_lqr_boston_noise <- results_lqr_boston_noise %>%
   group_by(Quantile, Method) %>%
   summarise(MeanLoss = mean(Loss, na.rm = TRUE, scientific = FALSE), .groups = 'drop')
 print(summary_lqr_boston_noise)
 
-#--- QQR ---
-#Summarising QQR mean loss results
+# --- QQR ---
+# Summarising QQR mean loss results
 summary_qqr_boston_noise <- results_qqr_next_boston_noise %>%
   group_by(Quantile, Method) %>%
   summarise(MeanLoss = mean(Loss, na.rm = TRUE), .groups = 'drop')
 print(summary_qqr_boston_noise)
 
-#--- TRM ---
-#Summarising TRM mean loss results
+# --- TRM ---
+# Summarising TRM mean loss results
 results_trm_boston_noise[1, "Loss"] <- 0.0536067997911971
 summary_trm_boston_noise <- results_trm_boston_noise %>%
   group_by(Quantile) %>%
   summarise(MeanLoss = mean(Loss, na.rm = TRUE), .groups = 'drop')
 print(summary_trm_boston_noise)
 
-#--- TRC ---
-#Summarising TRC mean loss results
+# --- TRC ---
+# Summarising TRC mean loss results
 summary_trc_boston_noise <- results_trc_boston_noise %>%
   group_by(Quantile) %>%
   summarise(MeanLoss = mean(Loss, na.rm = TRUE), .groups = 'drop')
 print(summary_trc_boston_noise)
 
-#--- TRP ---
-#Summarising TRP mean loss results
+# --- TRP ---
+# Summarising TRP mean loss results
 summary_trp_boston_noise <- results_trp_boston_noise %>%
   group_by(Quantile) %>%
   summarise(MeanLoss = mean(Loss, na.rm = TRUE), .groups = 'drop')
@@ -717,38 +694,36 @@ final_summary_boston_noise <- summary_qrf_boston_noise %>%
 
 print(final_summary_boston_noise)
 
-# Reshape the data for ggplot2
+# To make a plot of the loss values for each method and quantile, we make the following dataframe
 final_summary_long_boston_noise <- final_summary_boston_noise %>%
   pivot_longer(cols = -Quantile, names_to = "Method", values_to = "Value")
 
-# Set the order of the models
+# To make the order the same as in the original paper
 final_summary_long_boston_noise$Method <- factor(final_summary_long_boston_noise$Method, levels = c("QRF", "LQR", "QQR", "TRC", "TRM", "TRP"))
 
-# Define colors for each method
+# To make the colors the same as in the original QRF paper
 method_colors <- c("QRF" = "black", "LQR" = "green", "QQR" = "green",
                    "TRC" = "red", "TRM" = "red", "TRP" = "red")
 
-# Plot function
+# Make the graph
 plot_function <- function(data, alpha) {
   ggplot(data, aes(x = Method, y = Value, color = Method)) +
     geom_point(size = 3) +
     scale_color_manual(values = method_colors) +
     ggtitle(paste("α =", alpha)) +
     theme(axis.text.x = element_text(angle = 45, hjust = 1),
-          axis.title.y = element_blank(),  # Remove vertical axis title
-          axis.title.x = element_blank(),  # Remove horizontal axis title
+          axis.title.y = element_blank(),  
+          axis.title.x = element_blank(),  
           legend.position = "none")
 }
 
-# Generate plots for each quantile
+# Make plots for each quantile
 plots <- lapply(unique(final_summary_long_boston_noise$Quantile), function(alpha) {
-  plot_function(final_summary_long %>% filter(Quantile == alpha), alpha)
+  plot_function(final_summary_long_boston_noise %>% filter(Quantile == alpha), alpha)
 })
 
-# Arrange plots in a single row
+# The graphs should be in a single row
 combined_plot <- grid.arrange(grobs = plots, ncol = length(plots))
 
 # Save the plot
 ggsave("boston_noise Housing All Models.png", combined_plot, width = 15, height = 5)
-
-
