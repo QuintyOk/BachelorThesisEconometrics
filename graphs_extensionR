@@ -1,0 +1,210 @@
+#Install packages and load librarys
+#install.packages("viridis") #For colour scale of graphs
+#install.packages("ggplot2") #For creating the graphs
+#install.packages("dplyr) #For ordering the variables so that the order of the legend matches it 
+#install.packages("scales") #For a different colour scale of graphs
+#install.packages("corrplot") #For making the correlation matrices
+#install.packages("mlbench") #For the boston housing dataset
+
+library(ggplot2)
+library(viridis)
+library(dplyr)
+library(scales)
+library(corrplot)
+library(mlbench)
+
+#----- Boston Housing dataset -----
+#The correlation matrix for the boston housing dataset
+data("BostonHousing")
+boston <- BostonHousing
+boston_numeric <- boston[, sapply(boston, is.numeric)]
+
+corr_boston <- cor(boston_numeric)
+
+corrplot(corr_boston, method = "color", type = "upper", order = "hclust", 
+         tl.col = "black", tl.srt = 45, 
+         diag = FALSE)
+
+
+#Upload the final importance scores calculated with "boston_CVI.R"
+boston_importance_final <- read.csv("boston_importance_final.csv")
+
+# Calculate the maximum value for each variable and order them based on this
+max_values <- boston_importance_final %>%
+  group_by(variable) %>%
+  summarize(max_importance = max(conditional_importance))
+boston_importance_final$variable <- factor(boston_importance_final$variable, 
+                                           levels = max_values$variable[order(-max_values$max_importance)])
+
+#Graph for Standard Variable Importance for boston dataset
+standard_importance_boston_graph <- ggplot(data = boston_importance_final, aes(x = quantile, y = usual_importance, color = variable)) +
+  geom_line(size = 1.2) +  
+  labs(x = "Quantile", y = "Conditional Importance with Permutation (MIE)") +
+  scale_x_continuous(breaks = seq(0, 1, by = 0.1)) +
+  theme_minimal(base_size = 15) +  
+  theme(
+    legend.position = "right",
+    legend.title = element_blank(), 
+    legend.text = element_text(size = 12),  
+    axis.title = element_text(size = 15),  
+    axis.text = element_text(size = 12),  
+    panel.grid.major = element_line(color = "grey80", size = 0.5),  
+    panel.grid.minor = element_line(color = "grey90", size = 0.25), 
+    panel.border = element_blank()  #
+  ) +
+  scale_color_manual(values = hue_pal()(length(unique(boston_importance_final$variable))))
+
+#Saving the graph
+ggsave(filename = "boston_standard_importance.png", plot = standard_importance_boston_graph, width = 10, height = 7, dpi = 300)
+print(standard_importance_boston_graph)
+
+#Graph for Conditional Variable Importance for boston dataset
+conditional_importance_boston_graph <- ggplot(data = boston_importance_final, aes(x = quantile, y = conditional_importance, color = variable)) +
+  geom_line(size = 1.2) +  
+  labs(x = "Quantile", y = "Conditional Importance with Permutation (MIE)") +
+  scale_x_continuous(breaks = seq(0, 1, by = 0.1)) +
+  theme_minimal(base_size = 15) +  
+  theme(
+    legend.position = "right",
+    legend.title = element_blank(), 
+    legend.text = element_text(size = 12),  
+    axis.title = element_text(size = 15),  
+    axis.text = element_text(size = 12),  
+    panel.grid.major = element_line(color = "grey80", size = 0.5),  
+    panel.grid.minor = element_line(color = "grey90", size = 0.25), 
+    panel.border = element_blank()  #
+  ) +
+  scale_color_manual(values = hue_pal()(length(unique(boston_importance_final$variable))))
+#Saving the graph
+ggsave(filename = "boston_conditional_importance_graph.png", plot = conditional_importance_boston_graph, width = 10, height = 7, dpi = 300)
+print(conditional_importance_boston_graph)
+
+
+#Upload the final importance scores calculated with "boston_CVI.R" for the sampled dataset
+boston_importance_final_sample <- read.csv("boston_importance_final_sample.csv")
+
+# Calculate the maximum value for each variable and order them based on this
+max_values <- boston_importance_final_sample %>%
+  group_by(variable) %>%
+  summarize(max_importance = max(conditional_importance))
+boston_importance_final_sample$variable <- factor(boston_importance_final_sample$variable, 
+                                           levels = max_values$variable[order(-max_values$max_importance)])
+
+#Graph for Standard Variable Importance for boston dataset
+standard_importance_boston_sample_graph <- ggplot(data = boston_importance_final_sample, aes(x = quantile, y = usual_importance, color = variable)) +
+  geom_line(size = 1.2) +  
+  labs(x = "Quantile", y = "Conditional Importance with Permutation (MIE)") +
+  scale_x_continuous(breaks = seq(0, 1, by = 0.1)) +
+  theme_minimal(base_size = 15) +  
+  theme(
+    legend.position = "right",
+    legend.title = element_blank(), 
+    legend.text = element_text(size = 12),  
+    axis.title = element_text(size = 15),  
+    axis.text = element_text(size = 12),  
+    panel.grid.major = element_line(color = "grey80", size = 0.5),  
+    panel.grid.minor = element_line(color = "grey90", size = 0.25), 
+    panel.border = element_blank()  #
+  ) +
+  scale_color_manual(values = hue_pal()(length(unique(boston_importance_final_sample$variable))))
+
+#Saving the graph
+ggsave(filename = "boston_standard_importance_sample_graph.png", plot = standard_importance_boston_sample_graph, width = 10, height = 7, dpi = 300)
+print(standard_importance_boston_sample_graph)
+
+#Graph for Conditional Variable Importance for boston dataset sample
+conditional_importance_boston_sample_graph <- ggplot(data = boston_importance_final_sample, aes(x = quantile, y = conditional_importance, color = variable)) +
+  geom_line(size = 1.2) +  
+  labs(x = "Quantile", y = "Conditional Importance with Permutation (MIE)") +
+  scale_x_continuous(breaks = seq(0, 1, by = 0.1)) +
+  theme_minimal(base_size = 15) +  
+  theme(
+    legend.position = "right",
+    legend.title = element_blank(), 
+    legend.text = element_text(size = 12),  
+    axis.title = element_text(size = 15),  
+    axis.text = element_text(size = 12),  
+    panel.grid.major = element_line(color = "grey80", size = 0.5),  
+    panel.grid.minor = element_line(color = "grey90", size = 0.25), 
+    panel.border = element_blank()  #
+  ) +
+  scale_color_manual(values = hue_pal()(length(unique(boston_importance_final_sample$variable))))
+
+#Saving the graph
+ggsave(filename = "boston_conditional_importance_sample_graph.png", plot = conditional_importance_boston_sample_graph, width = 10, height = 7, dpi = 300)
+print(conditional_importance_boston_sample_graph)
+
+#----- NHANES dataset -----
+#Graph for the correlation matrix
+nhanes_clean <- read.csv("/Users/quintyokhuijsen/Downloads/cleaned_nhanes.csv")
+nhanes_clean2 <- select(nhanes_clean, -c(ID, SurveyYr, SexEver, BPDiaAve, BPSys1, BPDia1, BPSys2, BPDia2, BPSys3, BPDia3, Weight, BMI_WHO, DirectChol))
+nhanes <- na.omit(nhanes_clean2)
+character_cols <- sapply(nhanes, is.character)
+nhanes[character_cols] <- lapply(nhanes[character_cols], as.factor)
+target_var <- "BPSysAve"
+selected_vars <- c("Age", "BMI", "PhysActive", "AlcoholYear", "TotChol")
+nhanes_selected_vars <- nhanes %>% select(c(target_var, selected_vars))
+
+nhanes_numeric <- nhanes_selected_vars[, sapply(nhanes_selected_vars, is.numeric)]
+
+corr_nhanes <- cor(nhanes_numeric)
+
+corrplot(corr_nhanes, method = "color", type = "upper", order = "hclust", 
+         tl.col = "black", tl.srt = 45, 
+         diag = FALSE)
+
+
+
+
+
+nhanes_importance_final <- read.csv("nhanes_importance_final.csv")
+
+# Calculate the maximum value for each variable and order them based on this
+max_values <- nhanes_importance_final %>%
+  group_by(variable) %>%
+  summarize(max_importance = max(conditional_importance))
+nhanes_importance_final$variable <- factor(nhanes_importance_final$variable, 
+                                           levels = max_values$variable[order(-max_values$max_importance)])
+#Graph for Standard Variable Importance for NHANES dataset
+standard_importance_nhanes_graph <- ggplot(data = nhanes_importance_final, aes(x = quantile, y = usual_importance, color = variable)) +
+  geom_line(size = 1.2) +  
+  labs(x = "Quantile", y = "Standard Importance with Permutation (MIE)") +
+  scale_x_continuous(breaks = seq(0, 1, by = 0.1)) +
+  theme_minimal(base_size = 15) +  
+  theme(
+    legend.position = "right",
+    legend.title = element_blank(), 
+    legend.text = element_text(size = 12),  
+    axis.title = element_text(size = 15),  
+    axis.text = element_text(size = 12),  
+    panel.grid.major = element_line(color = "grey80", size = 0.5),  
+    panel.grid.minor = element_line(color = "grey90", size = 0.25), 
+    panel.border = element_blank()  #
+  ) +
+  scale_color_viridis_d(option = "D") 
+
+#Saving the graph
+ggsave(filename = "nhanes_standard_importance_graph.png", plot = standard_importance_nhanes_graph, width = 10, height = 7, dpi = 300)
+
+
+#Graph for Conditional Variable Importance for NHANES dataset
+conditional_importance_nhanes_graph <- ggplot(data = nhanes_importance_final, aes(x = quantile, y = conditional_importance, color = variable)) +
+  geom_line(size = 1.2) +  
+  labs(x = "Quantile", y = "Conditional Importance with Permutation (MIE)") +
+  scale_x_continuous(breaks = seq(0, 1, by = 0.1)) +
+  theme_minimal(base_size = 15) +  
+  theme(
+    legend.position = "right",
+    legend.title = element_blank(), 
+    legend.text = element_text(size = 15),  
+    axis.title = element_text(size = 15),  
+    axis.text = element_text(size = 15),  
+    panel.grid.major = element_line(color = "grey80", size = 0.5),  
+    panel.grid.minor = element_line(color = "grey90", size = 0.25), 
+    panel.border = element_blank()  #
+  ) +
+  scale_color_viridis_d(option = "D") 
+
+#Saving the graph
+ggsave(filename = "nhanes_conditional_importance_graph.png", plot = conditional_importance_nhanes_graph, width = 10, height = 7, dpi = 300)
+
