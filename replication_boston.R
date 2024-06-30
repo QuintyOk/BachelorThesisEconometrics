@@ -1,5 +1,5 @@
 #This code is done on the Boston Housing dataset. If you wish to test it on another dataset you need to make a few modifications to the code.
-# Installing packages
+# Installing packages (uncomment if not installed yet)
  # install.packages("quantregForest")
  # install.packages("mlbench")
  # install.packages("alr4")
@@ -10,7 +10,7 @@
  # install.packages("quantreg")
  # install.packages("gridExtra")
 
-# Loading necessary libraries
+# Loading libraries
 library(quantregForest)
 library(quantreg)
 library(mlbench)
