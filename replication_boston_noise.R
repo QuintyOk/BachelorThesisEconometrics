@@ -64,6 +64,7 @@ boston_noise_test <- list()
 results_qrf_boston_noise <- data.frame()
 results_lqr_boston_noise <- data.frame()
 results_qqr_next_boston_noise <- data.frame()
+results_qqr_boston_noise <- data.frame(Fold = integer(), Quantile = numeric(), Loss = numeric(), stringsAsFactors = FALSE)
 results_trm_boston_noise <- data.frame()
 results_trc_boston_noise <- data.frame()
 results_trp_boston_noise <- data.frame()
@@ -351,6 +352,11 @@ for (i in 1:5) {
     if (improved) {
       best_cv_error_boston_noise_qqr <- current_best_error
       best_model_boston_noise_qqr <- current_best_formula
+    }
+    
+    for (q in quantiles) {
+      quantile_specific_error <- mean(results_qqr_next_boston_noise$Loss[results_qqr_next_boston_noise$Fold == i & results_qqr_next_boston_noise$Quantile == q])
+      results_qqr_boston_noise <- rbind(results_qqr_boston_noise, data.frame(Fold = i, Quantile = q, Loss = quantile_specific_error))
     }
     
     cat("Final model: ", deparse(best_model_boston_noise_qqr), "with error: ", best_cv_error_boston_noise_qqr, "\n")
@@ -694,36 +700,165 @@ final_summary_boston_noise <- summary_qrf_boston_noise %>%
 
 print(final_summary_boston_noise)
 
-# To make a plot of the loss values for each method and quantile, we make the following dataframe
-final_summary_long_boston_noise <- final_summary_boston_noise %>%
-  pivot_longer(cols = -Quantile, names_to = "Method", values_to = "Value")
+# Function to calculate bootstrap confidence intervals
+bootstrap_ci <- function(data, n_bootstrap = 1000) {
+  quantiles <- unique(data$Quantile)
+  results <- list()
+  
+  for (q in quantiles) {
+    quantile_data <- data %>% filter(Quantile == q) %>% select(Loss)
+    
+    bootstrap_means <- numeric(n_bootstrap)
+    for (i in 1:n_bootstrap) {
+      bootstrap_sample <- sample(quantile_data$Loss, size = nrow(quantile_data), replace = TRUE)
+      bootstrap_means[i] <- mean(bootstrap_sample)
+    }
+    
+    ci_lower <- quantile(bootstrap_means, 0.025)
+    ci_upper <- quantile(bootstrap_means, 0.975)
+    
+    results[[as.character(q)]] <- list(mean_loss = mean(quantile_data$Loss), ci_lower = ci_lower, ci_upper = ci_upper)
+  }
+  
+  return(results)
+}
 
-# To make the order the same as in the original paper
-final_summary_long_boston_noise$Method <- factor(final_summary_long_boston_noise$Method, levels = c("QRF", "LQR", "QQR", "TRC", "TRM", "TRP"))
+#To make it reproducible, set the seed
+set.seed(123)
 
-# To make the colors the same as in the original QRF paper
+# Calculating bootstrap intervals for all methods (except QRF)
+bootstrap_lqr_boston_noise <- bootstrap_ci(results_lqr_boston_noise)
+boostrap_qqr_boston_noise <- bootstrap_ci(results_qqr_boston_noise)
+boostrap_trc_boston_noise <- bootstrap_ci(results_trc_boston_noise)
+boostrap_trm_boston_noise <- bootstrap_ci(results_trm_boston_noise)
+boostrap_trp_boston_noise <- bootstrap_ci(results_trp_boston_noise)
+
+#Create a dataframe that stores the mean loss and bootstrap intervals of all methods and quantiles
+final_results_loss_bootstrap_boston_noise <- data.frame(Method = character(),
+                                                        Quantile = numeric(),
+                                                        Average_Loss = numeric(),
+                                                        Upper_Interval = numeric(),
+                                                        Lower_Interval = numeric(),
+                                                        stringsAsFactors = FALSE)
+# Adding QRF average loss to dataframe (no bootstrap intervals)
+for (i in 1:nrow(summary_qrf_boston_noise)) {
+  final_results_loss_bootstrap_boston_noise <- rbind(final_results_loss_bootstrap_boston_noise, data.frame(
+    Method = "QRF",
+    Quantile = summary_qrf_boston_noise$Quantile[i],
+    Average_Loss = summary_qrf_boston_noise$QRF[i],
+    Upper_Interval = NA,  # No upper interval for QRF
+    Lower_Interval = NA,  # No lower interval for QRF
+    stringsAsFactors = FALSE
+  ))
+}
+
+# Adding LQR average loss and confidence intervals to dataframe
+for (quantile in names(bootstrap_lqr_boston_noise)) {
+  quantile_result <- bootstrap_lqr_boston_noise[[quantile]]
+  final_results_loss_bootstrap_boston_noise <- rbind(final_results_loss_bootstrap_boston_noise, data.frame(
+    Method = "LQR",
+    Quantile = as.numeric(quantile),
+    Average_Loss = quantile_result$mean_loss,
+    Upper_Interval = quantile_result$ci_upper,
+    Lower_Interval = quantile_result$ci_lower,
+    stringsAsFactors = FALSE
+  ))
+}
+
+# Adding QQR average loss and confidence intervals to dataframe
+for (quantile in names(boostrap_qqr_boston_noise)) {
+  quantile_result <- boostrap_qqr_boston_noise[[quantile]]
+  final_results_loss_bootstrap_boston_noise <- rbind(final_results_loss_bootstrap_boston_noise, data.frame(
+    Method = "QQR",
+    Quantile = as.numeric(quantile),
+    Average_Loss = quantile_result$mean_loss,
+    Upper_Interval = quantile_result$ci_upper,
+    Lower_Interval = quantile_result$ci_lower,
+    stringsAsFactors = FALSE
+  ))
+}
+
+# Adding TRC average loss and confidence intervals to dataframe
+for (quantile in names(boostrap_trc_boston_noise)) {
+  quantile_result <- boostrap_trc_boston_noise[[quantile]]
+  final_results_loss_bootstrap_boston_noise <- rbind(final_results_loss_bootstrap_boston_noise, data.frame(
+    Method = "TRC",
+    Quantile = as.numeric(quantile),
+    Average_Loss = quantile_result$mean_loss,
+    Upper_Interval = quantile_result$ci_upper,
+    Lower_Interval = quantile_result$ci_lower,
+    stringsAsFactors = FALSE
+  ))
+}
+
+# Adding TRM average loss and confidence intervals to dataframe
+for (quantile in names(boostrap_trm_boston_noise)) {
+  quantile_result <- boostrap_trm_boston_noise[[quantile]]
+  final_results_loss_bootstrap_boston_noise <- rbind(final_results_loss_bootstrap_boston_noise, data.frame(
+    Method = "TRM",
+    Quantile = as.numeric(quantile),
+    Average_Loss = quantile_result$mean_loss,
+    Upper_Interval = quantile_result$ci_upper,
+    Lower_Interval = quantile_result$ci_lower,
+    stringsAsFactors = FALSE
+  ))
+}
+
+# Adding TRP average loss and confidence intervals to dataframe
+for (quantile in names(boostrap_trp_boston_noise)) {
+  quantile_result <- boostrap_trp_boston_noise[[quantile]]
+  final_results_loss_bootstrap_boston_noise <- rbind(final_results_loss_bootstrap_boston_noise, data.frame(
+    Method = "TRP",
+    Quantile = as.numeric(quantile),
+    Average_Loss = quantile_result$mean_loss,
+    Upper_Interval = quantile_result$ci_upper,
+    Lower_Interval = quantile_result$ci_lower,
+    stringsAsFactors = FALSE
+  ))
+}
+
+#To print the final results, including the average loss and bootstrap confidence intervals of all quantiles and methods
+print(final_results_loss_bootstrap_boston_noise)
+
+library(ggplot2)
+library(gridExtra)
+
+
+# Each method group gets a different colour in the graph
 method_colors <- c("QRF" = "black", "LQR" = "green", "QQR" = "green",
                    "TRC" = "red", "TRM" = "red", "TRP" = "red")
 
-# Make the graph
+# From left to right, the graph should show QRF, LQR, QQR, TRC, TRM and TRP
+final_results_loss_bootstrap_boston_noise$Method <- factor(final_results_loss_bootstrap_boston_noise$Method, 
+                                                           levels = c("QRF", "LQR", "QQR", "TRC", "TRM", "TRP"))
+
+# Function to create the graph that shows the average loss, with the bootstrap intervals as vertical confidence bound lines
 plot_function <- function(data, alpha) {
-  ggplot(data, aes(x = Method, y = Value, color = Method)) +
+  qrf_avg_loss <- data %>% filter(Method == "QRF") %>% select(Average_Loss) %>% distinct() %>% pull()
+  
+  ggplot(data, aes(x = Method, y = Average_Loss, color = Method)) +
     geom_point(size = 3) +
+    geom_errorbar(aes(ymin = Lower_Interval, ymax = Upper_Interval), width = 0.2) +
+    
+    #QRF should have a black horizonal line through it
+    geom_hline(yintercept = qrf_avg_loss, linetype = "dashed", color = "black") +
     scale_color_manual(values = method_colors) +
     ggtitle(paste("α =", alpha)) +
     theme(axis.text.x = element_text(angle = 45, hjust = 1),
-          axis.title.y = element_blank(),  
-          axis.title.x = element_blank(),  
+          axis.title.y = element_blank(),  # Remove vertical axis title
+          axis.title.x = element_blank(),  # Remove horizontal axis title
           legend.position = "none")
 }
 
-# Make plots for each quantile
-plots <- lapply(unique(final_summary_long_boston_noise$Quantile), function(alpha) {
-  plot_function(final_summary_long_boston_noise %>% filter(Quantile == alpha), alpha)
+
+
+# Create the graphs for each quantile and method
+plots <- lapply(unique(final_results_loss_bootstrap_boston_noise$Quantile), function(quantile) {
+  plot_function(final_results_loss_bootstrap_boston_noise %>% filter(Quantile == quantile), quantile)
 })
 
-# The graphs should be in a single row
-combined_plot <- grid.arrange(grobs = plots, ncol = length(plots))
+# Arrange the graphs in a grid with specified order
+final_graph_boston_noise <- grid.arrange(grobs = plots, ncol = length(unique(final_results_loss_bootstrap_boston_noise$Quantile)))
 
-# Save the plot
-ggsave("boston_noise Housing All Models.png", combined_plot, width = 15, height = 5)
+# Saving the final graph
+ggsave("loss_bootstrap_boston_noise_graph.png", final_graph_boston_noise)
