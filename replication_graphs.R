@@ -109,6 +109,7 @@ boston <- BostonHousing
 response_var_boston <- "medv"
 
 # Perform 5-fold cross-validation
+#Since we use the same seed the folds will be the same as in the replication_boston code
 set.seed(123)
 folds <- cut(seq(1, nrow(boston)), breaks = 5, labels = FALSE)
 
