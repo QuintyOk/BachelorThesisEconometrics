@@ -26,7 +26,7 @@ cat("== Step 1: Processing the dataset and determining predictor variables == \n
 
 # Read and clean the NHANES dataset (this dataset is also attached in the github)
 nhanes_clean <- read.csv("/Users/quintyokhuijsen/Downloads/cleaned_nhanes.csv")
-# Remove unwanted columns
+# Remove variables that were similar to other variables
 nhanes_clean2 <- select(nhanes_clean, -c(ID, SurveyYr, SexEver, BPDiaAve, BPSys1, BPDia1, BPSys2, BPDia2, BPSys3, BPDia3, Weight, BMI_WHO, DirectChol))
 # Remove missing observations
 nhanes <- na.omit(nhanes_clean2)
