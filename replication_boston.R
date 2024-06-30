@@ -364,14 +364,14 @@ for (i in 1:5) {
     # Read the existing R script content
     r_script_content <- readLines(r_script_boston)
     
-    # Change the lines related to reading the test file and column names
+    # Modify the lines related to reading the test file and column names
     r_script_content <- gsub("read.table\\((.*)\\)", "read.table(\\1, sep = \"\")", r_script_content)
     r_script_content <- gsub("newdata <- read.table\\(.*\\)", sprintf("newdata <- read.table('boston_test_%d.txt', header = FALSE, colClasses = 'character', sep = '')", i), r_script_content)
-     # Change the node and pred lines
+     # Modify the node and pred lines
     r_script_content <- gsub("node <- NULL", "node <- NULL\npred <- NULL", r_script_content)
 
     
-    # Change the lines that convert columns to numeric and calculate predictions
+    # Modify the lines that convert columns to numeric and calculate predictions
     r_script_content <- gsub("newdata <- transform\\(.*\\)", "", r_script_content)
     r_script_content <- gsub("newdata <- as.numeric\\(.*\\)", "", r_script_content)
     
@@ -442,7 +442,7 @@ for (i in 1:5) {
     # Generate prediction R script name
     r_script <- sprintf("predict_TRC_bos_%d_q%03d.r", i, q * 1000)
     
-    # Change the R script to read from the test file and calculate loss
+    # Modify the R script to read from the test file and calculate loss
     r_script_content <- readLines(r_script)
     r_script_content <- gsub("read.table\\((.*)\\)", "read.table(\\1, sep = \"\")", r_script_content)
     r_script_content <- gsub("newdata <- read.table\\(.*\\)", sprintf("newdata <- read.table('boston_test_%d.txt', header = FALSE, colClasses = 'character', sep = '')", i), r_script_content)
@@ -514,7 +514,7 @@ for (i in 1:5) {
     # Generate prediction R script name
     r_script <- sprintf("predict_TRP_bos_%d_q%03d.r", i, q * 1000)
     
-    # Change the R script to read from the test file and calculate loss (otherwise the script does not run)
+    # Modify the R script to read from the test file and calculate loss (otherwise the script does not run)
     r_script_content <- readLines(r_script)
     r_script_content <- gsub("read.table\\((.*)\\)", "read.table(\\1, sep = \"\")", r_script_content)
     r_script_content <- gsub("boston_train_[0-9]+.txt", sprintf("boston_test_%d.txt", i), r_script_content)
